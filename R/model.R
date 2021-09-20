@@ -203,7 +203,7 @@ cuml_predict.cuml_model <- function(model, x, output_class_probabilities = NULL,
 #'
 #' @param model The model object.
 #' @param connection An open connection or \code{NULL}. If \code{NULL}, then the
-#'   model state is serialized to a raw vector.
+#'   model state is serialized to a raw vector. Default: NULL.
 #' @param ... Additional arguments to \code{base::serialize()}.
 #'
 #' @return \code{NULL} unless \code{connection} is \code{NULL}, in which case
@@ -212,28 +212,36 @@ cuml_predict.cuml_model <- function(model, x, output_class_probabilities = NULL,
 #' @seealso \code{\link[base]{serialize}}
 #'
 #' @export
-cuml_serialize <- function(model, connection, ...) {
+cuml_serialize <- function(model, connection = NULL, ...) {
   UseMethod("cuml_serialize")
 }
 
+#' @rdname cuml_serialize
+#'
 #' @export
-cuml_serialize.default <- function(model, connection, ...) {
+cuml_serialise <- cuml_serialize
+
+#' @export
+cuml_serialize.default <- function(model, connection = NULL, ...) {
   report_undefined_fn("cuml_serialize", model)
 }
 
 #' @export
-cuml_serialize.cuml_model <- function(model, connection, ...) {
-  model_type <- class(model)[[1]]
-  get_state_impl <- tryCatch(
-    get(paste0(".", model_type, "_get_state")),
-    error = function(e) {
-      stop("Model of type '", model_type, "' does not support serialization.")
-    }
-  )
+cuml_serialize.cuml_model <- function(model, connection = NULL, ...) {
+  model_state <- cuml_get_state(model)
 
-  model %>%
-    get_state_impl() %>%
-    serialize(connection, ...)
+  serialize(model_state, connection, ...)
+}
+
+cuml_get_state <- function(model) {
+  UseMethod("cuml_get_state")
+}
+
+cuml_get_state.default <- function(model) {
+  stop(
+    "Model of type '", paste(class(model), collapse = " "), "' does not ",
+    "support serialization."
+  )
 }
 
 #' Unserialize a CuML model state
@@ -249,17 +257,24 @@ cuml_serialize.cuml_model <- function(model, connection, ...) {
 #'
 #' @export
 cuml_unserialize <- function(connection, ...) {
-  state <- unserialize(connection, ...)
-  model_type <- attributes(state)$model_type
-  set_state_impl <- tryCatch(
-    get(paste0(".", model_type, "_set_state")),
-    error = function(e) {
-      stop("Model of type '", model_type, "' does not support unserialization.")
-    }
+  model_state <- unserialize(connection, ...)
+
+  cuml_set_state(model_state)
+}
+
+#' @rdname cuml_unserialize
+#'
+#' @export
+cuml_unserialise <- cuml_unserialize
+
+
+cuml_set_state <- function(model_state) {
+  UseMethod("cuml_set_state")
+}
+
+cuml_set_state.default <- function(model_state) {
+  stop(
+    "No unserialization routine found for model state of type '",
+    paste(class(model_state), collapse = " "), "'"
   )
-
-  model <- set_state_impl(state)
-  class(model) <- c(model_type, "cuml_model", class(model))
-
-  model
 }

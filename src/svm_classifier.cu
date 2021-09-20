@@ -5,6 +5,7 @@
 #include "pinned_host_vector.h"
 #include "preprocessor.h"
 #include "stream_allocator.h"
+#include "svm_serde.h"
 
 #include <cuml/svm/svm_parameter.h>
 #include <thrust/async/copy.h>
@@ -16,9 +17,16 @@
 #include <memory>
 #include <vector>
 
+namespace cuml4r {
+
 namespace {
 
-struct ModelCtx {
+constexpr auto kSvcKernelParams = "kernel_params";
+constexpr auto kSvcSvmParams = "svm_params";
+constexpr auto kSvcModel = "model";
+
+class ModelCtx {
+ public:
   using model_t = ML::SVM::SVC<double>;
 
   // model object must be destroyed first
@@ -28,11 +36,29 @@ struct ModelCtx {
   __host__ ModelCtx(std::unique_ptr<raft::handle_t> handle,
                     std::unique_ptr<model_t> model) noexcept
     : handle_(std::move(handle)), model_(std::move(model)) {}
+
+  __host__ Rcpp::List getState() const {
+    Rcpp::List state;
+
+    state[kSvcKernelParams] = detail::getState(model_->kernel_params);
+    state[kSvcSvmParams] = detail::getState(model_->param);
+    state[kSvcModel] =
+      detail::getState(/*svm_model=*/model_->model, /*handle=*/*handle_);
+
+    return state;
+  }
+
+  __host__ void setState(Rcpp::List const& state) {
+    detail::setState(/*kernel_params=*/model_->kernel_params,
+                     /*state=*/state[kSvcKernelParams]);
+    detail::setState(/*svm_params=*/model_->param,
+                     /*state=*/state[kSvcSvmParams]);
+    detail::setState(/*svm_model=*/model_->model, /*handle=*/*handle_,
+                     /*state=*/state[kSvcModel]);
+  }
 };
 
 }  // namespace
-
-namespace cuml4r {
 
 __host__ SEXP svc_fit(Rcpp::NumericMatrix const& input,
                       Rcpp::NumericVector const& labels, double const cost,
@@ -126,6 +152,24 @@ __host__ SEXP svc_predict(SEXP model_xptr, Rcpp::NumericMatrix const& input,
   CUDA_RT_CALL(cudaStreamSynchronize(stream));
 
   return Rcpp::NumericVector(h_preds.begin(), h_preds.end());
+}
+
+__host__ Rcpp::List svc_get_state(SEXP model) {
+  return Rcpp::XPtr<ModelCtx>(model)->getState();
+}
+
+__host__ SEXP svc_set_state(Rcpp::List const& state) {
+  auto stream_view = cuml4r::stream_allocator::getOrCreateStream();
+  auto handle = std::make_unique<raft::handle_t>();
+  cuml4r::handle_utils::initializeHandle(*handle, stream_view.value());
+
+  auto model = std::make_unique<ML::SVM::SVC<double>>(*handle);
+
+  auto model_ctx = std::make_unique<ModelCtx>(
+    /*handle=*/std::move(handle), /*model=*/std::move(model));
+  model_ctx->setState(state);
+
+  return Rcpp::XPtr<ModelCtx>(model_ctx.release());
 }
 
 }  // namespace cuml4r

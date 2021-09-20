@@ -292,7 +292,7 @@ cuml_svm_classification_multiclass_impl <- function(processed, cost, kernel,
         )
 
         new_model(
-          cls = "cuml_svm",
+          cls = c("cuml_svc", "cuml_svm"),
           mode = "classification",
           xptr <- model_xptr
         )
@@ -302,11 +302,31 @@ cuml_svm_classification_multiclass_impl <- function(processed, cost, kernel,
   }
 
   new_model(
-    cls = "cuml_svm",
+    cls = c("cuml_svc_ovr", "cuml_svm"),
     mode = "classification",
     xptr = models,
     multiclass = TRUE,
     blueprint = processed$blueprint
+  )
+}
+
+cuml_get_state.cuml_svc_ovr <- function(model) {
+  model_state <- list(
+    ovr_model_states = lapply(model$xptr, function(x) cuml_get_state(x)),
+    blueprint = model$blueprint
+  )
+  class(model_state) <- c("cuml_svc_ovr_model_state", class(model_state))
+
+  model_state
+}
+
+cuml_set_state.cuml_svc_ovr_model_state <- function(model_state) {
+  new_model(
+    cls = c("cuml_svc_ovr", "cuml_svm"),
+    mode = "classification",
+    xptr = lapply(model_state$ovr_model_states, function(x) cuml_set_state(x)),
+    multiclass = TRUE,
+    blueprint = model_state$blueprint
   )
 }
 
@@ -335,11 +355,31 @@ cuml_svm_classification_binary_impl <- function(processed, cost, kernel, gamma,
   )
 
   new_model(
-    cls = "cuml_svm",
+    cls = c("cuml_svc", "cuml_svm"),
     mode = "classification",
     xptr = model_xptr,
     multiclass = FALSE,
     blueprint = processed$blueprint
+  )
+}
+
+cuml_get_state.cuml_svc <- function(model) {
+  model_state <- list(
+    model_state = .svc_get_state(model$xptr),
+    blueprint = model$blueprint
+  )
+  class(model_state) <- c("cuml_svc_model_state", class(model_state))
+
+  model_state
+}
+
+cuml_set_state.cuml_svc_model_state <- function(model_state) {
+  new_model(
+    cls = c("cuml_svc", "cuml_svm"),
+    mode = "classification",
+    xptr = .svc_set_state(model_state$model_state),
+    multiclass = FALSE,
+    blueprint = model_state$blueprint
   )
 }
 
@@ -368,7 +408,7 @@ cuml_svm_regression_impl <- function(processed, cost, kernel, gamma, coef0,
   )
 
   new_model(
-    cls = "cuml_svm",
+    cls = c("cuml_svr", "cuml_svm"),
     mode = "regression",
     xptr = model_xptr,
     blueprint = processed$blueprint

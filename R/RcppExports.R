@@ -101,12 +101,28 @@
     .Call(`_cuml_svc_predict`, model_xptr, input, predict_class)
 }
 
+.svc_get_state <- function(model) {
+    .Call(`_cuml_svc_get_state`, model)
+}
+
+.svc_set_state <- function(state) {
+    .Call(`_cuml_svc_set_state`, state)
+}
+
 .svr_fit <- function(X, y, cost, kernel, gamma, coef0, degree, tol, max_iter, nochange_steps, cache_size, epsilon, sample_weights, verbosity) {
     .Call(`_cuml_svr_fit`, X, y, cost, kernel, gamma, coef0, degree, tol, max_iter, nochange_steps, cache_size, epsilon, sample_weights, verbosity)
 }
 
 .svr_predict <- function(svr_xptr, X) {
     .Call(`_cuml_svr_predict`, svr_xptr, X)
+}
+
+.svr_get_state <- function(model) {
+    .Call(`_cuml_svr_get_state`, model)
+}
+
+.svr_set_state <- function(state) {
+    .Call(`_cuml_svr_set_state`, state)
 }
 
 .tsne_fit <- function(x, dim, n_neighbors, theta, epssq, perplexity, perplexity_max_iter, perplexity_tol, early_exaggeration, late_exaggeration, exaggeration_iter, min_gain, pre_learning_rate, post_learning_rate, max_iter, min_grad_norm, pre_momentum, post_momentum, random_state, verbosity, initialize_embeddings, square_distances, algo) {
@@ -129,11 +145,11 @@
     .Call(`_cuml_umap_transform`, model, x)
 }
 
-.cuml_umap_get_state <- function(model) {
+.umap_get_state <- function(model) {
     .Call(`_cuml_umap_get_state`, model)
 }
 
-.cuml_umap_set_state <- function(state) {
+.umap_set_state <- function(state) {
     .Call(`_cuml_umap_set_state`, state)
 }
 
